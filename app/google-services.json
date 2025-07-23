@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "351580347407",
+    "project_id": "mouth-fresher",
+    "storage_bucket": "mouth-fresher.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:351580347407:android:55d713f11f1f812ac4d77a",
+        "android_client_info": {
+          "package_name": "com.apmw.MouthFresher"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDnKu98UpbAmKgKszx5MmGMvN_p0NC52pM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:351580347407:android:fba754a2c0d7915fc4d77a",
+        "android_client_info": {
+          "package_name": "com.apmw.freshbrand"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDnKu98UpbAmKgKszx5MmGMvN_p0NC52pM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

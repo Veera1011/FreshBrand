@@ -1,25 +1,23 @@
-// CheckoutScreen.kt
 package com.apmw.freshbrand.view.client
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.apmw.freshbrand.model.*
 import com.apmw.freshbrand.viewmodel.CartViewModel
 import com.apmw.freshbrand.viewmodel.OrderViewModel
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import androidx.compose.ui.text.font.FontWeight
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,12 +30,29 @@ fun CheckoutScreen(
     val cartUiState by cartViewModel.uiState.collectAsState()
     val orderUiState by orderViewModel.uiState.collectAsState()
 
-    var selectedPaymentMethod by remember { mutableStateOf(PaymentMethod.PAY_LATER) }
     var deliveryAddress by remember { mutableStateOf("") }
     var orderNotes by remember { mutableStateOf("") }
     var showOrderSummary by remember { mutableStateOf(false) }
 
-    // Handle order placement success
+    // 🔄 Fetch current user's address from Firestore
+    LaunchedEffect(Unit) {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid
+        userId?.let { uid ->
+            FirebaseFirestore.getInstance()
+                .collection("users")
+                .document(uid)
+                .get()
+                .addOnSuccessListener { document ->
+                    val addressFromFirestore = document.getString("address") ?: ""
+                    deliveryAddress = addressFromFirestore
+                }
+                .addOnFailureListener {
+                    // Optional: Handle error (e.g., log, toast)
+                }
+        }
+    }
+
+    // ✅ Handle order placed success
     LaunchedEffect(orderUiState.orderPlaced) {
         if (orderUiState.orderPlaced) {
             cartViewModel.clearCart()
@@ -52,7 +67,7 @@ fun CheckoutScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Order Items
+        // Order Items Summary
         item {
             Card(shape = RoundedCornerShape(12.dp), elevation = CardDefaults.cardElevation(4.dp)) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -83,7 +98,7 @@ fun CheckoutScreen(
             }
         }
 
-        // Delivery Address
+        // Delivery Address (Read-only)
         item {
             Card(shape = RoundedCornerShape(12.dp), elevation = CardDefaults.cardElevation(4.dp)) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -91,60 +106,18 @@ fun CheckoutScreen(
                     Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
                         value = deliveryAddress,
-                        onValueChange = { deliveryAddress = it },
-                        label = { Text("Enter delivery address") },
+                        onValueChange = {}, // Read-only
+                        readOnly = true,
+                        label = { Text("Delivery Address") },
+                        placeholder = { Text("Street, City, State, PIN Code") },
                         modifier = Modifier.fillMaxWidth(),
-                        minLines = 3,
-                        placeholder = { Text("Street, City, State, PIN Code") }
+                        minLines = 3
                     )
                 }
             }
         }
 
-        // Payment Methods
-        item {
-            Card(shape = RoundedCornerShape(12.dp), elevation = CardDefaults.cardElevation(4.dp)) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Payment Method", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(12.dp))
-
-                    listOf(
-                        PaymentMethod.RAZORPAY to Pair(Icons.Default.CreditCard, "Pay with Razorpay"),
-                        PaymentMethod.PAY_LATER to Pair(Icons.Default.Schedule, "Pay Later")
-                    ).forEach { (method, iconTextPair) ->
-                        val (icon, label) = iconTextPair
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .selectable(
-                                    selected = selectedPaymentMethod == method,
-                                    onClick = { selectedPaymentMethod = method }
-                                )
-                                .padding(vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(
-                                selected = selectedPaymentMethod == method,
-                                onClick = { selectedPaymentMethod = method }
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                            Spacer(Modifier.width(8.dp))
-                            Column {
-                                Text(label)
-                                if (method == PaymentMethod.RAZORPAY) {
-                                    Text("UPI, Cards, Net Banking", style = MaterialTheme.typography.bodySmall)
-                                } else {
-                                    Text("Pay within 40 days after delivery", style = MaterialTheme.typography.bodySmall)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Notes
+        // Order Notes
         item {
             Card(shape = RoundedCornerShape(12.dp), elevation = CardDefaults.cardElevation(4.dp)) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -162,7 +135,7 @@ fun CheckoutScreen(
             }
         }
 
-        // Summary
+        // Order Summary
         item {
             Card(
                 shape = RoundedCornerShape(12.dp),
@@ -189,6 +162,14 @@ fun CheckoutScreen(
                         Text("Total:", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         Text("₹${cartUiState.totalAmount.toInt()}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     }
+
+                    Spacer(Modifier.height(8.dp))
+
+                    Text(
+                        "Note: You can choose payment method after placing the order",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                    )
                 }
             }
         }
@@ -200,7 +181,7 @@ fun CheckoutScreen(
                     orderViewModel.placeOrder(
                         cartItems = cartUiState.cartItems,
                         customDesign = null,
-                        paymentMethod = selectedPaymentMethod,
+                        paymentMethod = PaymentMethod.PAY_LATER, // Default to pay later
                         userAddress = deliveryAddress,
                         notes = orderNotes
                     )
@@ -216,11 +197,7 @@ fun CheckoutScreen(
                 } else {
                     Icon(Icons.Default.ShoppingCart, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        if (selectedPaymentMethod == PaymentMethod.RAZORPAY)
-                            "Pay ₹${cartUiState.totalAmount.toInt()}"
-                        else "Place Order"
-                    )
+                    Text("Place Order")
                 }
             }
         }

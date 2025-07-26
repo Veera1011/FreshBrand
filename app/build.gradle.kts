@@ -71,6 +71,13 @@ dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
 // For sharing files
     implementation("androidx.activity:activity-compose:1.8.2")
+    // Play Services Auth for phone verification
+    implementation("com.google.android.gms:play-services-auth:20.7.0")
+    implementation("com.razorpay:checkout:1.6.33")
+    // Phone number verification
+    implementation("com.google.firebase:firebase-auth:22.3.0")
+    // Gson for JSON parsing (for navigation arguments)
+    implementation("com.google.code.gson:gson:2.10.1")
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

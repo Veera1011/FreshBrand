@@ -202,8 +202,8 @@ fun ClientDashboardScreen(
                             onNavigateToDesign = { selectedDrawerItem = "Sachet Design" },
                             orderViewModel = orderViewModel
                         )
-                      //  is ClientBottomNavTab.Orders -> Orders()
-                       is ClientBottomNavTab.Orders -> OrdersScreen(orderViewModel)
+                       // is ClientBottomNavTab.Orders -> Orders()
+                        is ClientBottomNavTab.Orders -> OrdersScreen(orderViewModel)
                         is ClientBottomNavTab.Shop -> ShopTabScreen(productViewModel, cartViewModel)
                     }
                 }
@@ -233,8 +233,8 @@ fun ShopTabScreen(
 
         when (selectedTabIndex) {
             0 -> OrderProductsScreen(productViewModel)
-           // 1 -> Cart()
-            1 -> CartScreen(cartViewModel)
+            //1 -> Cart()
+           1 -> CartScreen(cartViewModel)
         }
     }
 }

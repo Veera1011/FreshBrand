@@ -285,7 +285,7 @@ fun ActionSection(
             OutlinedButton(
                 onClick = onPickDate,
                 modifier = Modifier.weight(1f),
-                enabled = !isUpdating
+              //  enabled = !isUpdating
             ) {
                 Icon(Icons.Default.DateRange, null)
                 Spacer(Modifier.width(6.dp))

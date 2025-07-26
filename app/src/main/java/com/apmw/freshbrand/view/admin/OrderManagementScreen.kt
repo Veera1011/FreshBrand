@@ -48,7 +48,7 @@ fun OrderManagementScreen(
     viewModel: AdminOrderViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    var selectedFilter by remember { mutableStateOf(OrderStatus.PENDING) }
+    var selectedFilter by remember { mutableStateOf<OrderStatus?>(null) } // null means "All"
     var searchQuery by remember { mutableStateOf("") }
     var showOrderDetails by remember { mutableStateOf(false) }
     var isFilterExpanded by remember { mutableStateOf(false) }
@@ -58,7 +58,7 @@ fun OrderManagementScreen(
     }
 
     val filteredOrders = uiState.orders.filter { order ->
-        (selectedFilter == OrderStatus.PENDING || order.status == selectedFilter) &&
+        (selectedFilter == null || order.status == selectedFilter) &&
                 (searchQuery.isEmpty() || listOf(
                     order.userName,
                     order.userEmail,
@@ -71,7 +71,6 @@ fun OrderManagementScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // Compact Top Bar with integrated search and filters
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -82,7 +81,6 @@ fun OrderManagementScreen(
             Column(
                 modifier = Modifier.padding(16.dp)
             ) {
-                // Header row with title and actions
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -95,7 +93,6 @@ fun OrderManagementScreen(
                     )
 
                     Row {
-                        // Refresh button
                         IconButton(
                             onClick = { viewModel.loadOrders() },
                             modifier = Modifier.size(36.dp)
@@ -107,7 +104,6 @@ fun OrderManagementScreen(
                             )
                         }
 
-                        // Filter toggle button
                         IconButton(
                             onClick = { isFilterExpanded = !isFilterExpanded },
                             modifier = Modifier.size(36.dp)
@@ -118,7 +114,7 @@ fun OrderManagementScreen(
                                 modifier = Modifier
                                     .size(20.dp)
                                     .rotate(if (isFilterExpanded) 180f else 0f),
-                                tint = if (selectedFilter != OrderStatus.PENDING)
+                                tint = if (selectedFilter != null)
                                     MaterialTheme.colorScheme.primary
                                 else MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -128,7 +124,6 @@ fun OrderManagementScreen(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Compact search bar
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
@@ -162,7 +157,6 @@ fun OrderManagementScreen(
                     textStyle = LocalTextStyle.current.copy(fontSize = 14.sp)
                 )
 
-                // Expandable filter section
                 AnimatedVisibility(
                     visible = isFilterExpanded,
                     enter = expandVertically(
@@ -183,7 +177,6 @@ fun OrderManagementScreen(
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
 
-                        // Compact filter chips in a flow layout
                         CompactFilterChips(
                             selectedFilter = selectedFilter,
                             orders = uiState.orders,
@@ -194,7 +187,6 @@ fun OrderManagementScreen(
             }
         }
 
-        // Error message
         uiState.error?.let { error ->
             Card(
                 modifier = Modifier
@@ -213,13 +205,12 @@ fun OrderManagementScreen(
             }
         }
 
-        // Order List
         if (uiState.isLoading) {
             LoadingState()
         } else if (filteredOrders.isEmpty()) {
             EmptyState(
                 hasOrders = uiState.orders.isNotEmpty(),
-                isFiltered = searchQuery.isNotEmpty() || selectedFilter != OrderStatus.PENDING
+                isFiltered = searchQuery.isNotEmpty() || selectedFilter != null
             )
         } else {
             LazyColumn(
@@ -231,9 +222,6 @@ fun OrderManagementScreen(
                     EnhancedOrderCard(
                         order = order,
                         user = uiState.orderUsers[order.userId],
-//                        customDesign = order.customDesign?.let {
-//                            uiState.customDesigns[it.id] ?: it
-//                        },
                         onClick = {
                             viewModel.selectOrder(order)
                             showOrderDetails = true
@@ -241,23 +229,16 @@ fun OrderManagementScreen(
                         onViewInvoice = {
                             viewModel.selectOrder(order)
                             viewModel.showInvoice(true)
-                        },
-//                        onViewCustomDesign = {
-//                            viewModel.selectOrder(order)
-//                        }
+                        }
                     )
                 }
             }
         }
 
-        // Dialogs remain the same...
         if (showOrderDetails && uiState.selectedOrder != null) {
             OrderDetailsDialog(
                 order = uiState.selectedOrder!!,
                 user = uiState.orderUsers[uiState.selectedOrder!!.userId],
-//                customDesign = uiState.selectedOrder!!.customDesign?.let {
-//                    uiState.customDesigns[it.id] ?: it
-//                },
                 isUpdating = uiState.isUpdating,
                 onUpdateStatus = { status -> viewModel.updateOrderStatus(uiState.selectedOrder!!.id, status) },
                 onUpdateDeliveryDate = { date -> viewModel.updateDeliveryDate(uiState.selectedOrder!!.id, date) },
@@ -276,37 +257,34 @@ fun OrderManagementScreen(
             InvoiceDialog(
                 order = uiState.selectedOrder!!,
                 user = uiState.orderUsers[uiState.selectedOrder!!.userId],
-//                customDesign = uiState.selectedOrder!!.customDesign?.let {
-//                    uiState.customDesigns[it.id] ?: it
-//                },
                 onDismiss = { viewModel.showInvoice(false) }
             )
         }
     }
 }
 
+
 @Composable
 fun CompactFilterChips(
-    selectedFilter: OrderStatus,
+    selectedFilter: OrderStatus?,
     orders: List<Order>,
-    onFilterSelected: (OrderStatus) -> Unit
+    onFilterSelected: (OrderStatus?) -> Unit
 ) {
-    // Create a flow layout for chips
-    val allStatuses = listOf(OrderStatus.PENDING) + OrderStatus.values().toList()
+    val allStatuses: List<OrderStatus?> = listOf(null) + OrderStatus.values().toList()
 
     LazyRow(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         contentPadding = PaddingValues(horizontal = 0.dp)
     ) {
         items(allStatuses) { status ->
-            val count = if (status == OrderStatus.PENDING) {
-                orders.size // "All" shows total count
+            val count = if (status == null) {
+                orders.size
             } else {
                 orders.count { it.status == status }
             }
 
             val isSelected = selectedFilter == status
-            val label = if (status == OrderStatus.PENDING) "All" else status.name
+            val label = status?.name?.lowercase()?.replaceFirstChar { it.uppercaseChar() } ?: "All"
 
             FilterChip(
                 selected = isSelected,
@@ -327,6 +305,7 @@ fun CompactFilterChips(
         }
     }
 }
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -415,22 +394,24 @@ fun EnhancedOrderCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    IconButton(
-                        onClick = { onViewInvoice() },
-                        modifier = Modifier
-                            .size(12.dp)
-                            .background(
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                              //  shape = CircleShape.createOutline(2,3,4,5,4.0)
-                            )
-                    ) {
-                        Icon(
-                            Icons.Default.Receipt,
-                            contentDescription = "Invoice",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(10.dp)
-                        )
-                    }
+                  if(order.status == OrderStatus.DELIVERED) {
+                      IconButton(
+                          onClick = { onViewInvoice() },
+                          modifier = Modifier
+                              .size(12.dp)
+                              .background(
+                                  color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                                  //  shape = CircleShape.createOutline(2,3,4,5,4.0)
+                              )
+                      ) {
+                          Icon(
+                              Icons.Default.Receipt,
+                              contentDescription = "Invoice",
+                              tint = MaterialTheme.colorScheme.primary,
+                              modifier = Modifier.size(10.dp)
+                          )
+                      }
+                  }
                     Spacer(Modifier.width(7.dp))
                     // Compact status badge
                     Surface(

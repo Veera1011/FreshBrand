@@ -14,7 +14,7 @@ data class Order(
     val tax: Double = 0.0,
     val totalAmount: Double = 0.0,
     val status: OrderStatus = OrderStatus.PENDING,
-    val paymentMethod: PaymentMethod = PaymentMethod.PAY_LATER,
+    val paymentMethod: PaymentMethod = PaymentMethod.NOT_SET,
     val paymentStatus: PaymentStatus = PaymentStatus.PENDING,
     val razorpayPaymentId: String = "",
     val razorpayOrderId: String = "",
@@ -35,7 +35,8 @@ enum class OrderStatus {
 
 enum class PaymentMethod {
     RAZORPAY,
-    PAY_LATER
+    PAY_LATER,
+    NOT_SET
 }
 
 enum class PaymentStatus {

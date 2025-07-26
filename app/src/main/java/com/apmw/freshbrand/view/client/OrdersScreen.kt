@@ -1,9 +1,12 @@
 // OrdersScreen.kt
 package com.apmw.freshbrand.view.client
 
+import android.app.Activity
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -12,12 +15,16 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.apmw.freshbrand.MainActivity
 import com.apmw.freshbrand.model.*
 import com.apmw.freshbrand.viewmodel.OrderViewModel
+import com.apmw.freshbrand.startRazorpayPayment
+import com.apmw.freshbrand.view.admin.InvoiceDialog
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -25,26 +32,50 @@ import java.util.*
 @Composable
 fun OrdersScreen(
     orderViewModel: OrderViewModel = viewModel(),
-    onNavigateBack: () -> Unit = {}
+    onNavigateBack: () -> Unit = {},
+    currentUser: User? = null
 ) {
     val orderUiState by orderViewModel.uiState.collectAsState()
+    var showPaymentDialog by remember { mutableStateOf(false) }
+    var showInvoiceDialog by remember { mutableStateOf(false) }
+    var selectedOrder by remember { mutableStateOf<Order?>(null) }
 
     LaunchedEffect(Unit) {
         orderViewModel.loadOrders()
     }
 
-    Scaffold(
-//        topBar = {
-//            TopAppBar(
-//                title = { Text("My Orders") },
-//                navigationIcon = {
-//                    IconButton(onClick = onNavigateBack) {
-//                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-//                    }
-//                }
-//            )
-//        }
-    ) { padding ->
+    if (showPaymentDialog && selectedOrder != null) {
+        PaymentMethodDialog(
+            order = selectedOrder!!,
+            onDismiss = {
+                showPaymentDialog = false
+                selectedOrder = null
+            },
+            onPaymentMethodSelected = { order, paymentMethod ->
+                showPaymentDialog = false
+                if (paymentMethod == PaymentMethod.RAZORPAY) {
+                    // Payment will be handled in the dialog
+                } else {
+                    // Handle PAY_LATER
+                }
+                selectedOrder = null
+            },
+            orderViewModel = orderViewModel
+        )
+    }
+
+    if (showInvoiceDialog && selectedOrder != null) {
+        InvoiceDialog(
+            order = selectedOrder!!,
+            user = currentUser,
+            onDismiss = {
+                showInvoiceDialog = false
+                selectedOrder = null
+            }
+        )
+    }
+
+    Scaffold { padding ->
         when {
             orderUiState.isLoading -> {
                 Box(
@@ -95,7 +126,17 @@ fun OrdersScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     items(orderUiState.orders) { order ->
-                        OrderCard(order = order)
+                        OrderCard(
+                            order = order,
+                            onPayNow = {
+                                selectedOrder = order
+                                showPaymentDialog = true
+                            },
+                            onViewInvoice = {
+                                selectedOrder = order
+                                showInvoiceDialog = true
+                            }
+                        )
                     }
                 }
             }
@@ -104,7 +145,11 @@ fun OrdersScreen(
 }
 
 @Composable
-fun OrderCard(order: Order) {
+fun OrderCard(
+    order: Order,
+    onPayNow: () -> Unit = {},
+    onViewInvoice: () -> Unit = {}
+) {
     Card(
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier.fillMaxWidth(),
@@ -125,7 +170,32 @@ fun OrderCard(order: Order) {
                     fontWeight = FontWeight.Bold
                 )
 
-                OrderStatusChip(status = order.status)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Invoice button for delivered orders
+                    if (order.status == OrderStatus.DELIVERED) {
+                        IconButton(
+                            onClick = onViewInvoice,
+                            modifier = Modifier
+                                .size(32.dp)
+                                .background(
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                        ) {
+                            Icon(
+                                Icons.Default.Receipt,
+                                contentDescription = "View Invoice",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+
+                    OrderStatusChip(status = order.status)
+                }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -221,20 +291,20 @@ fun OrderCard(order: Order) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Track Order Button
-                OutlinedButton(
-                    onClick = { /* TODO: Track order */ },
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(Icons.Default.Visibility, contentDescription = null)
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Track")
-                }
+//                // Track Order Button
+//                OutlinedButton(
+//                    onClick = { /* TODO: Track order */ },
+//                    modifier = Modifier.weight(1f)
+//                ) {
+//                    Icon(Icons.Default.Visibility, contentDescription = null)
+//                    Spacer(modifier = Modifier.width(4.dp))
+//                    Text("Track")
+//                }
 
-                // Pay Now Button (if payment pending)
-                if (order.paymentStatus == PaymentStatus.PENDING) {
+                // Pay Now Button (only for delivered orders with pending payment)
+                if (order.status == OrderStatus.DELIVERED && order.paymentStatus == PaymentStatus.PENDING) {
                     Button(
-                        onClick = { /* TODO: Handle payment */ },
+                        onClick = onPayNow,
                         modifier = Modifier.weight(1f)
                     ) {
                         Icon(Icons.Default.Payment, contentDescription = null)
@@ -244,19 +314,151 @@ fun OrderCard(order: Order) {
                 }
 
                 // Reorder Button (if delivered)
-                if (order.status == OrderStatus.DELIVERED) {
-                    Button(
-                        onClick = { /* TODO: Reorder */ },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(Icons.Default.Refresh, contentDescription = null)
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Reorder")
-                    }
-                }
+//                if (order.status == OrderStatus.DELIVERED) {
+//                    Button(
+//                        onClick = { /* TODO: Reorder */ },
+//                        modifier = Modifier.weight(1f)
+//                    ) {
+//                        Icon(Icons.Default.Refresh, contentDescription = null)
+//                        Spacer(modifier = Modifier.width(4.dp))
+//                        Text("Reorder")
+//                    }
+//                }
             }
         }
     }
+}
+
+@Composable
+fun PaymentMethodDialog(
+    order: Order,
+    onDismiss: () -> Unit,
+    onPaymentMethodSelected: (Order, PaymentMethod) -> Unit,
+    orderViewModel: OrderViewModel
+) {
+    var selectedPaymentMethod by remember { mutableStateOf(PaymentMethod.RAZORPAY) }
+    var isPaymentInProgress by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
+    AlertDialog(
+        onDismissRequest = { if (!isPaymentInProgress) onDismiss() },
+        title = {
+            Text(
+                "Choose Payment Method",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column {
+                Text(
+                    text = "Order Total: ₹${order.totalAmount.toInt()}",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Payment method selection
+                listOf(
+                    PaymentMethod.RAZORPAY to Pair(Icons.Default.CreditCard, "Pay with Razorpay"),
+                    PaymentMethod.PAY_LATER to Pair(Icons.Default.Schedule, "Continue with Pay Later")
+                ).forEach { (method, iconTextPair) ->
+                    val (icon, label) = iconTextPair
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .selectable(
+                                selected = selectedPaymentMethod == method,
+                                onClick = { if (!isPaymentInProgress) selectedPaymentMethod = method }
+                            )
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = selectedPaymentMethod == method,
+                            onClick = { if (!isPaymentInProgress) selectedPaymentMethod = method },
+                            enabled = !isPaymentInProgress
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.width(8.dp))
+                        Column {
+                            Text(label)
+                            if (method == PaymentMethod.RAZORPAY) {
+                                Text("UPI, Cards, Net Banking, Wallets", style = MaterialTheme.typography.bodySmall)
+                            } else {
+                                Text("Pay later with in due", style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    }
+                }
+
+                if (isPaymentInProgress) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp))
+                        Text(
+                            "Processing payment...",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (selectedPaymentMethod == PaymentMethod.RAZORPAY) {
+                        isPaymentInProgress = true
+                        (context as? MainActivity)?.initiateRazorpayPayment(
+                            order = order,
+                            onSuccess = { paymentId, razorpayOrderId ->
+                                isPaymentInProgress = false
+                                orderViewModel.updatePaymentStatus(order.id, paymentId, razorpayOrderId)
+                                onDismiss()
+                            },
+                            onFailure = { error ->
+                                isPaymentInProgress = false
+                                // You can show a snackbar or toast here
+                                // For now, just dismiss the dialog
+                                onDismiss()
+                            }
+                        )
+                    } else {
+                        onPaymentMethodSelected(order, selectedPaymentMethod)
+                    }
+                },
+                enabled = !isPaymentInProgress
+            ) {
+                if (isPaymentInProgress && selectedPaymentMethod == PaymentMethod.RAZORPAY) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
+                    Text(
+                        if (selectedPaymentMethod == PaymentMethod.RAZORPAY)
+                            "Pay ₹${order.totalAmount.toInt()}"
+                        else "Continue"
+                    )
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !isPaymentInProgress
+            ) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 @Composable
